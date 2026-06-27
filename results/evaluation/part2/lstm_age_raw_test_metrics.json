@@ -1,0 +1,62 @@
+{
+  "mae": 6.248892089345611,
+  "subgroup_metrics": {
+    "gender": {
+      "F": {
+        "count": 8250,
+        "mae": 5.3303658898093484
+      },
+      "M": {
+        "count": 6300,
+        "mae": 7.451724017309764
+      }
+    },
+    "ethnicity": {
+      "CHINESE": {
+        "count": 8550,
+        "mae": 5.74843312157525
+      },
+      "INDIAN": {
+        "count": 2700,
+        "mae": 7.803859879529035
+      },
+      "MALAY": {
+        "count": 3300,
+        "mae": 6.273289404782382
+      }
+    },
+    "age_bin": {
+      "1X": {
+        "count": 900,
+        "mae": 6.579061711629231
+      },
+      "2X": {
+        "count": 5700,
+        "mae": 3.3517283319172106
+      },
+      "3X": {
+        "count": 4050,
+        "mae": 7.009140528926143
+      },
+      "4X": {
+        "count": 2400,
+        "mae": 9.401242131392161
+      },
+      "5X": {
+        "count": 1350,
+        "mae": 8.441526469477902
+      },
+      "6X": {
+        "count": 150,
+        "mae": 23.662079175313313
+      }
+    }
+  },
+  "subgroup_metrics_includes_target": false,
+  "subgroup_metrics_excluded_target_column": null,
+  "metric_definitions": {
+    "mae": "Mean absolute error over all evaluation samples.",
+    "subgroup_metrics.*.*.count": "Number of samples in the subgroup.",
+    "subgroup_metrics.*.*.mae": "Mean absolute error within the subgroup."
+  }
+}

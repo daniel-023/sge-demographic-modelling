@@ -1,0 +1,124 @@
+{
+  "accuracy": 0.9858323113664236,
+  "f1_macro": 0.9857471620137084,
+  "f1_weighted": 0.985825876279642,
+  "precision_macro": 0.9862227086285232,
+  "recall_macro": 0.9853400938663593,
+  "f1_class_0": 0.9868488062071238,
+  "f1_class_1": 0.9846455178202931,
+  "subgroup_metrics": {
+    "ethnicity": {
+      "CHINESE": {
+        "count": 19994,
+        "accuracy": 0.9888966690007002,
+        "f1_macro": 0.9885099631894744
+      },
+      "INDIAN": {
+        "count": 5796,
+        "accuracy": 0.9746376811594203,
+        "f1_macro": 0.9714042097310573
+      },
+      "MALAY": {
+        "count": 5196,
+        "accuracy": 0.9865280985373364,
+        "f1_macro": 0.9862961467049263
+      }
+    },
+    "age_bin": {
+      "1X": {
+        "count": 4411,
+        "accuracy": 0.9936522330537293,
+        "f1_macro": 0.9936412885220285
+      },
+      "2X": {
+        "count": 7781,
+        "accuracy": 0.982135972240072,
+        "f1_macro": 0.9820165789284876
+      },
+      "3X": {
+        "count": 10087,
+        "accuracy": 0.9892931495984931,
+        "f1_macro": 0.9892768722921395
+      },
+      "4X": {
+        "count": 3581,
+        "accuracy": 0.9673275621334823,
+        "f1_macro": 0.9432690749250847
+      },
+      "5X": {
+        "count": 2928,
+        "accuracy": 0.9972677595628415,
+        "f1_macro": 0.9966247352267323
+      },
+      "6X": {
+        "count": 2198,
+        "accuracy": 0.9822565969062784,
+        "f1_macro": 0.9817362630479234
+      }
+    }
+  },
+  "subgroup_metrics_includes_target": false,
+  "subgroup_metrics_excluded_target_column": "gender",
+  "metric_definitions": {
+    "accuracy": "Overall exact-match accuracy over all evaluation samples.",
+    "f1_macro": "Unweighted mean of per-class F1 scores.",
+    "f1_weighted": "Support-weighted mean of per-class F1 scores.",
+    "precision_macro": "Unweighted mean of per-class precision scores.",
+    "recall_macro": "Unweighted mean of per-class recall scores.",
+    "per_class_metrics.*.support": "Number of true samples for the class label.",
+    "per_class_metrics.*.precision": "Precision for the class label.",
+    "per_class_metrics.*.recall": "Recall for the class label (TP/(TP+FN)).",
+    "per_class_metrics.*.f1": "F1 score for the class label.",
+    "subgroup_metrics.*.*.count": "Number of samples in the subgroup.",
+    "subgroup_metrics.*.*.accuracy": "Accuracy computed only within the subgroup.",
+    "subgroup_metrics.*.*.f1_macro": "Macro-F1 computed only within the subgroup.",
+    "confusion_matrix.matrix": "Raw confusion-matrix counts (rows=true labels, cols=pred labels).",
+    "confusion_matrix.matrix_row_normalized": "Row-normalized confusion matrix where each row sums to 1."
+  },
+  "per_class_metrics": {
+    "F": {
+      "class_index": 0,
+      "support": 16600,
+      "precision": 0.9815267266551457,
+      "recall": 0.9922289156626506,
+      "f1": 0.9868488062071238
+    },
+    "M": {
+      "class_index": 1,
+      "support": 14386,
+      "precision": 0.9909186906019007,
+      "recall": 0.9784512720700681,
+      "f1": 0.9846455178202931
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "F",
+      "M"
+    ],
+    "class_indices": [
+      0,
+      1
+    ],
+    "matrix": [
+      [
+        16471,
+        129
+      ],
+      [
+        310,
+        14076
+      ]
+    ],
+    "matrix_row_normalized": [
+      [
+        0.9922289156626506,
+        0.007771084337349398
+      ],
+      [
+        0.021548727929931878,
+        0.9784512720700681
+      ]
+    ]
+  }
+}

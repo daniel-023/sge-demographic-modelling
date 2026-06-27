@@ -1,0 +1,85 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -N train_lstm
+#PBS -l select=1:ngpus=1:ncpus=8:mem=64gb
+#PBS -l walltime=24:00:00
+#PBS -P <YOUR_PROJECT_CODE>
+#PBS -j oe
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+die() { echo "$1" >&2; exit 2; }
+
+USER_ROOT="${USER_ROOT:-/scratch/users/ntu/<YOUR_USER>}"
+BASE_ROOT="${BASE_ROOT:-$USER_ROOT/FYP}"
+export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-$USER_ROOT/micromamba}"
+MAMBA="${MAMBA:-$USER_ROOT/bin/micromamba}"
+export PYTHONNOUSERSITE=1
+export PYTHONUNBUFFERED=1
+
+[[ -x "$MAMBA" ]] || die "missing micromamba: $MAMBA"
+
+PART="${PART:-}"
+if [[ -n "$PART" ]]; then
+  PART_ID="${PART#part_}"
+  PART_ID="${PART_ID#part}"
+fi
+PART_ID="${PART_ID:-2}"
+PART="part${PART_ID}"
+TASK="${TASK:-gender}"  # gender | ethnicity | age_bin | age_code | age_raw
+EMB_TAG="${EMB_TAG:-part${PART_ID}_cap150}"
+EMBEDDING_DIR="${EMBEDDING_DIR:-$BASE_ROOT/results/embeddings/baseplus/${EMB_TAG}}"
+METADATA_CSV="${METADATA_CSV:-$BASE_ROOT/data/metadata/cleaned/part${PART_ID}_speakers.csv}"
+SPLIT_DIR="${SPLIT_DIR:-$BASE_ROOT/data/splits}"
+BATCH_SIZE="${BATCH_SIZE:-32}"
+EPOCHS="${EPOCHS:-20}"
+LR="${LR:-3e-4}"
+HIDDEN_DIM="${HIDDEN_DIM:-128}"
+NUM_LAYERS="${NUM_LAYERS:-1}"
+OUTPUT_DIR="${OUTPUT_DIR:-$BASE_ROOT/results/lstm/${EMB_TAG}/${TASK}}"
+POOLING="${POOLING:-mean}"                   # last | mean | attn
+DROPOUT="${DROPOUT:-0.2}"
+NUM_WORKERS="${NUM_WORKERS:-4}"
+MAX_CACHED_CHUNKS="${MAX_CACHED_CHUNKS:-32}"
+PREFETCH_FACTOR="${PREFETCH_FACTOR:-1}"
+MAX_SEQ_LEN="${MAX_SEQ_LEN:-250}"
+EARLY_STOPPING_PATIENCE="${EARLY_STOPPING_PATIENCE:-3}"
+GRADIENT_CLIP="${GRADIENT_CLIP:-1.0}"
+TEST_SPLIT="${TEST_SPLIT:-test}"
+SELECTION_METRIC="${SELECTION_METRIC:-f1_macro}" # accuracy | f1_macro
+
+[[ -d "$EMBEDDING_DIR" ]] || die "missing EMBEDDING_DIR: $EMBEDDING_DIR"
+[[ -f "$METADATA_CSV" ]] || die "missing METADATA_CSV: $METADATA_CSV"
+[[ -d "$SPLIT_DIR" ]] || die "missing SPLIT_DIR: $SPLIT_DIR"
+
+CMD=(
+  python3 -m scripts.models.train_lstm
+  --task "$TASK"
+  --embedding_dir "$EMBEDDING_DIR"
+  --metadata_csv "$METADATA_CSV"
+  --split_dir "$SPLIT_DIR"
+  --batch_size "$BATCH_SIZE"
+  --epochs "$EPOCHS"
+  --lr "$LR"
+  --hidden_dim "$HIDDEN_DIM"
+  --num_layers "$NUM_LAYERS"
+  --dropout "$DROPOUT"
+  --pooling "$POOLING"
+  --num_workers "$NUM_WORKERS"
+  --max_cached_chunks "$MAX_CACHED_CHUNKS"
+  --prefetch_factor "$PREFETCH_FACTOR"
+  --max_seq_len "$MAX_SEQ_LEN"
+  --early_stopping_patience "$EARLY_STOPPING_PATIENCE"
+  --gradient_clip "$GRADIENT_CLIP"
+  --selection_metric "$SELECTION_METRIC"
+  --output_dir "$OUTPUT_DIR"
+  --test_split "$TEST_SPLIT"
+  --no_chunk_length_batching
+  --persistent_workers
+  --use_lr_scheduler
+  --amp
+  --evaluate
+)
+
+echo "Running: ${CMD[*]}"
+"$MAMBA" run -n fyp "${CMD[@]}"

@@ -1,0 +1,42 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -N speaker_embeddings
+#PBS -l select=1:ncpus=4:mem=16gb
+#PBS -l walltime=04:00:00
+#PBS -P <YOUR_PROJECT_CODE>
+#PBS -j oe
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+die() { echo "$1" >&2; exit 2; }
+
+USER_ROOT="${USER_ROOT:-/scratch/users/ntu/<YOUR_USER>}"
+BASE_ROOT="${BASE_ROOT:-$USER_ROOT/FYP}"
+REPO_ROOT="${REPO_ROOT:-$PBS_O_WORKDIR}"
+export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-$USER_ROOT/micromamba}"
+MAMBA="${MAMBA:-$USER_ROOT/bin/micromamba}"
+export PYTHONNOUSERSITE=1
+export PYTHONUNBUFFERED=1
+
+[[ -x "$MAMBA" ]] || die "missing micromamba: $MAMBA"
+
+PART_ID="${PART_ID:-1}"
+PART_TAG="part${PART_ID}"
+
+MLP_SHARD_DIR="${MLP_SHARD_DIR:-$BASE_ROOT/results/embeddings/baseplus/${PART_TAG}_cap150/train/mlp_shards}"
+METADATA_CSV="${METADATA_CSV:-$BASE_ROOT/data/metadata/cleaned/part${PART_ID}_speakers.csv}"
+OUT_PATH="${OUT_PATH:-$BASE_ROOT/results/analysis/speaker_embeddings/${PART_TAG}/speaker_embeddings.pt}"
+
+[[ -d "$MLP_SHARD_DIR" ]] || die "missing MLP_SHARD_DIR: $MLP_SHARD_DIR"
+[[ -f "$METADATA_CSV" ]] || die "missing METADATA_CSV: $METADATA_CSV"
+mkdir -p "$(dirname "$OUT_PATH")"
+
+CMD=(
+  python3 "$REPO_ROOT/scripts/analysis/speaker_embeddings.py"
+  --mlp-shard-dir "$MLP_SHARD_DIR"
+  --metadata-csv "$METADATA_CSV"
+  --out-path "$OUT_PATH"
+)
+
+echo "Running: ${CMD[*]}"
+"$MAMBA" run -n fyp "${CMD[@]}"

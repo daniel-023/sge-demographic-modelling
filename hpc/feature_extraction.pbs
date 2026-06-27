@@ -1,0 +1,79 @@
+#!/bin/bash
+#PBS -q normal
+#PBS -N wavlm_extract
+#PBS -l select=1:ngpus=1:ncpus=8:mem=64gb
+#PBS -l walltime=24:00:00
+#PBS -P <YOUR_PROJECT_CODE>
+#PBS -j oe
+
+set -euo pipefail
+cd "${PBS_O_WORKDIR:-$(pwd)}"
+die() { echo "$1" >&2; exit 2; }
+
+USER_ROOT="${USER_ROOT:-/scratch/users/ntu/<YOUR_USER>}"
+BASE_ROOT="${BASE_ROOT:-$USER_ROOT/FYP}"
+REPO_ROOT="${REPO_ROOT:-$PBS_O_WORKDIR}"
+export MAMBA_ROOT_PREFIX="${MAMBA_ROOT_PREFIX:-$USER_ROOT/micromamba}"
+MAMBA="${MAMBA:-$USER_ROOT/bin/micromamba}"
+
+export PYTHONNOUSERSITE=1
+export PYTHONUNBUFFERED=1
+export HF_HOME="${HF_HOME:-$USER_ROOT/hf_cache}"
+export TRANSFORMERS_CACHE="$HF_HOME/transformers"
+export HF_DATASETS_CACHE="$HF_HOME/datasets"
+
+[[ -x "$MAMBA" ]] || die "missing micromamba: $MAMBA"
+
+HF_TOKEN_FILE="${HF_TOKEN_FILE:-$HOME/.secrets/hf_token.sh}"
+if [[ -f "$HF_TOKEN_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$HF_TOKEN_FILE"
+fi
+
+PART="${PART:-}"
+if [[ -n "$PART" ]]; then
+  PART_ID="${PART#part_}"
+  PART_ID="${PART_ID#part}"
+fi
+PART_ID="${PART_ID:-1}"
+PART="part${PART_ID}"
+SPLIT="${SPLIT:-train}"               # train | val | test
+OUTPUTS="${OUTPUTS:-lstm}"            # both | mlp | lstm
+UTT_CSV="${UTT_CSV:-$BASE_ROOT/metadata/part${PART_ID}_utterances.csv}"
+OUT_TAG="${OUT_TAG:-}"
+if [[ -z "$OUT_TAG" ]]; then
+  if [[ "$OUTPUTS" == "mlp" ]]; then
+    OUT_TAG="part${PART_ID}_mlp_full"
+  else
+    OUT_TAG="part${PART_ID}_cap150"
+  fi
+fi
+OUT_DIR="${OUT_DIR:-$BASE_ROOT/results/embeddings/baseplus/${OUT_TAG}}"
+BATCH_SIZE="${BATCH_SIZE:-64}"
+MLP_SHARD_UTTS="${MLP_SHARD_UTTS:-5000}"
+LSTM_SHARD_UTTS="${LSTM_SHARD_UTTS:-256}"
+MAX_FRAMES="${MAX_FRAMES:-250}"
+LSTM_MAX_UTTS_PER_SPEAKER="${LSTM_MAX_UTTS_PER_SPEAKER:-150}"
+UTT_SAMPLE_SEED="${UTT_SAMPLE_SEED:-42}"
+
+EXTRACT_SCRIPT="${EXTRACT_SCRIPT:-$REPO_ROOT/scripts/features/feature_extraction.py}"
+[[ -f "$EXTRACT_SCRIPT" ]] || die "missing script: $EXTRACT_SCRIPT"
+[[ -f "$UTT_CSV" ]] || die "missing UTT_CSV: $UTT_CSV"
+mkdir -p "$OUT_DIR"
+
+CMD=(
+  python3 "$EXTRACT_SCRIPT"
+  --utt-csv "$UTT_CSV"
+  --out-dir "$OUT_DIR"
+  --batch-size "$BATCH_SIZE"
+  --split "$SPLIT"
+  --outputs "$OUTPUTS"
+  --mlp-shard-utts "$MLP_SHARD_UTTS"
+  --lstm-shard-utts "$LSTM_SHARD_UTTS"
+  --max-frames "$MAX_FRAMES"
+  --utt-sample-seed "$UTT_SAMPLE_SEED"
+  --lstm-max-utts-per-speaker "$LSTM_MAX_UTTS_PER_SPEAKER"
+)
+
+echo "Running: ${CMD[*]}"
+"$MAMBA" run -n fyp "${CMD[@]}"
