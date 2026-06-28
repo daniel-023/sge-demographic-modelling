@@ -7,7 +7,7 @@ EmbeddingDataset: For MLP training (mask-aware mean pooling over frames)
 SequenceEmbeddingDataset: For LSTM training (keeps frame sequences)
 
 Tasks:
-- Classification: gender, ethnicity, age_bin, age_code
+- Classification: gender, ethnicity, age_bin
 - Regression: age_raw
 """
 
@@ -22,7 +22,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, Sampler
 
 
-CLASSIFICATION_TASKS = {"gender", "ethnicity", "age_bin", "age_code"}
+CLASSIFICATION_TASKS = {"gender", "ethnicity", "age_bin"}
 REGRESSION_TASKS = {"age_raw"}
 SUPPORTED_TASKS = CLASSIFICATION_TASKS | REGRESSION_TASKS
 PART_PATTERN = re.compile(r"(part_?\d+)", re.IGNORECASE)
@@ -101,11 +101,6 @@ def _resolve_target_series(task, metadata):
         if "age" in metadata.columns:
             return metadata["age"].apply(_age_bin), "age", "classification"
         raise ValueError("Task 'age_bin' requires either 'age_group' or 'age' column in metadata")
-
-    if task == "age_code":
-        if "age" not in metadata.columns:
-            raise ValueError("Task 'age_code' requires an 'age' column in metadata")
-        return metadata["age"], "age", "classification"
 
     if task == "age_raw":
         if "age" not in metadata.columns:

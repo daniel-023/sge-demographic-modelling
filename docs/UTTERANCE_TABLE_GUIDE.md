@@ -1,96 +1,85 @@
-# Utterance Table Script - Usage Guide
+# Utterance Table Guide
 
-The `build_utterance_table.py` script is **part-agnostic** and can process all 5 NSC corpus parts.
-It now also supports **Part 3 TextGrid slicing** for speaker-separate conversational audio.
+`scripts.preprocessing.build_utterance_table` builds utterance-level CSV files used by feature extraction. It supports the speaker-folder layout used for Parts 1 and 2, plus a Part 3 TextGrid mode for slicing long speaker-separate recordings into utterance WAVs.
 
-## Requirements
+Run commands from the repository root.
 
-**Directory structure expected:**
-```
-sge-demographic-modelling/
-├── part_1/
-│   └── speakers/
-│       ├── speaker_0001/
-│       │   ├── utt_001.WAV
-│       │   └── utt_002.WAV
-│       └── speaker_0002/
-│           └── utt_003.WAV
-├── part_2/
-│   └── speakers/
-│       └── ...
-├── part_3/
-│   └── speakers/
-│       └── ...
-└── ... (parts 4, 5)
+## Speaker-Folder Parts
 
-data/
-├── splits/
-│   ├── part1_train.txt
-│   ├── part1_val.txt
-│   ├── part1_test.txt
-│   └── ... (all parts)
-└── metadata/
-    └── cleaned/
-        ├── part1_speakers.csv
-        ├── part2_speakers.csv
-        └── ... (all parts)
-```
-
-## Usage
-
-### Process all parts (with combined utterance table)
-```bash
-cd scripts/preprocessing
-python build_utterance_table.py --combined
-```
-
-### Process specific parts
-```bash
-python build_utterance_table.py --parts 1 2 3
-```
-
-### Custom audio directory for speaker-folder parts
-```bash
-python build_utterance_table.py --audio_root_base /path/to/audio/root
-```
-
-### Part 3 TextGrid slicing mode
-
-Use this when Part 3 source audio files are long speaker-separate recordings, e.g.
-`conf_2500_2500_00862025.wav`, and you want utterance-level WAVs from TextGrid intervals.
+Use this for parts where utterances already exist as individual WAV files under speaker folders.
 
 ```bash
-python build_utterance_table.py \
-  --parts 3 \
-  --part3_use_textgrid \
-  --part3_audio_dir /path/to/part3/conversation_wavs \
-  --part3_textgrid_dir "/Users/daniel/Documents/VSCode/NTU-LMS-FYP/sge-demographic-modelling/data/p3_textgrid/Scripts Separate" \
-  --part3_slice_out_dir /path/to/output/sliced_utterances
+python3 -m scripts.preprocessing.build_utterance_table \
+    --parts 1 2 \
+    --audio_root_base /path/to/audio/root
 ```
 
-Optional flags:
-- `--part3_silence_tokens "<Z>" "<S>"`: labels treated as silence
-- `--part3_overwrite_slices`: rewrite already-sliced WAVs
-- `--min_duration_sec` / `--max_duration_sec`: duration filtering applied during slicing
-- `--no_attach_speaker_metadata`: do not merge age/gender/ethnicity from `part3_speakers.csv`
+The script looks for layouts such as:
+
+```text
+part_1/speakers/<speaker>/wav/*.wav
+part1/speakers/<speaker>/wav/*.wav
+```
+
+## Part 3 TextGrid Slicing
+
+Use this when Part 3 has long speaker-separate WAV files and Praat/TextGrid interval timestamps.
+
+```bash
+python3 -m scripts.preprocessing.build_utterance_table \
+    --parts 3 \
+    --part3_use_textgrid \
+    --part3_audio_dir /path/to/part3/conversation_wavs \
+    --part3_textgrid_dir "/path/to/part3/Scripts Separate" \
+    --part3_slice_out_dir /path/to/output/sliced_utterances
+```
+
+The TextGrid mode:
+
+- reads `xmin`, `xmax`, and `text` interval fields
+- skips empty intervals and silence tokens such as `<Z>` and `<S>`
+- filters clips using `--min_duration_sec` and `--max_duration_sec`
+- writes sliced WAVs under `<slice_out_dir>/<speaker_id>/wav/`
+- records the source WAV, TextGrid path, transcript, and interval timestamps
+
+Useful optional flags:
+
+```bash
+--part3_silence_tokens "<Z>" "<S>"
+--part3_overwrite_slices
+--min_duration_sec 3.0
+--max_duration_sec 15.0
+--no_attach_speaker_metadata
+```
 
 ## Output
 
-For each part, generates: `data/metadata/cleaned/part{N}_utterances.csv`
+By default, per-part utterance tables are written to:
 
-With columns:
-- `speaker_id`: speaker ID matching split files
-- `utt_id`: Utterance ID (usually WAV filename stem)
-- `path`: Full path to WAV file
-- `duration_sec`: Duration in seconds
-- `split`: Train/val/test assignment
-- `age`, `gender`, `ethnicity`: merged from `data/metadata/cleaned/part{N}_speakers.csv` (default)
+```text
+data/metadata/utterances/part{N}_utterances.csv
+```
 
-For Part 3 TextGrid mode, additional columns are included:
+Core columns:
+
+- `part`
+- `speaker_id`
+- `utt_id`
+- `path`
+- `duration_sec`
+- `split`
+- `age`, `gender`, `ethnicity` when speaker metadata is attached
+
+Part 3 TextGrid mode also includes:
+
 - `start_sec`
 - `end_sec`
 - `source_path`
 - `textgrid_path`
 - `transcript`
 
-With `--combined`: Also generates `all_utterances.csv` containing all utterances from all parts.
+Use `--combined` to also write:
+
+```text
+data/metadata/utterances/all_utterances.csv
+```

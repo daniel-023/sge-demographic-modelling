@@ -1,35 +1,35 @@
 # Modelling Demographic Variation in Singapore English Speech
 
-A Final Year Project (FYP) on demographic prediction in Singapore English (SgE) using self-supervised speech representations. This repository explores whether speaker embeddings derived from WavLM retain information about demographic attributes such as gender, ethnicity, and age.
+This Final Year Project investigates whether self-supervised speech representations encode demographic information in Singapore English speech. The pipeline extracts `WavLM Base+` frame-level representations and trains lightweight downstream models for speaker profiling.
 
-## Project Overview
-
-The project uses `WavLM Base+` representations and prediction heads to study how demographic variation is reflected in Singapore English speech. The current experiments focus on three supervised tasks:
+The main experiments evaluate:
 
 - `gender` classification
 - `ethnicity` classification
-- `age` classification/regression
+- `age_raw` regression
 
-Two downstream model families are implemented:
+Two model families are compared:
 
-- MLP on pooled utterance-level embeddings
-- LSTM on sequential frame-level embeddings (150 random utterances per speaker)
+- MLP over pooled utterance-level embeddings
+- LSTM over frame-level embedding sequences
 
 ## Pipeline
 
 ![Project pipeline](figures/FYP_pipeline.png)
 
 Workflow:
-1. Prepare metadata and speaker-disjoint train/val/test splits.
-2. Extract embeddings from speech audio using a pretrained WavLM model.
-3. Train downstream MLP and LSTM models for demographic prediction.
-4. Evaluate held-out test performance and subgroup behaviour.
 
-## Results Overview
+1. Clean speaker metadata and create speaker-disjoint train/validation/test splits.
+2. Build utterance tables from the speech corpus.
+3. Extract WavLM embeddings for each utterance.
+4. Train MLP and LSTM demographic prediction heads.
+5. Evaluate held-out performance and subgroup behaviour.
 
-Saved evaluation outputs are available under `results/evaluation/part1/`, `results/evaluation/part2/`, and `results/evaluation/part3/`.
+## Results
 
-### Gender and Ethnicity Classification
+Saved summary metrics are included under `results/evaluation/`. Large generated artifacts such as embedding shards, utterance tables, and model checkpoints are intentionally excluded from git.
+
+### Gender and Ethnicity
 
 | Part | Task | MLP Accuracy | MLP Macro-F1 | LSTM Accuracy | LSTM Macro-F1 |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -40,50 +40,33 @@ Saved evaluation outputs are available under `results/evaluation/part1/`, `resul
 | 3 | Gender | 0.9860 | 0.9860 | 0.9850 | 0.9850 |
 | 3 | Ethnicity | 0.6960 | 0.6050 | 0.8130 | 0.7220 |
 
-### Age Tasks
+Ethnicity prediction improves consistently with the sequence-based LSTM, especially for minority ethnic groups.
 
-- Parts 1 and 2 use age regression (`age_raw`)
-    - Evaluation metric: mean absolute error (MAE).
-- Part 3 uses age classification (`age_bin`)
-    - Evaluation metric: accuracy / macro-F1.
+![Ethnicity per-class F1](figures/ethnicity_per_class_f1.png)
 
-| Part | Target | MLP | LSTM |
+Age-group subgroup metrics show how ethnicity performance varies across speaker age bands.
+
+![Ethnicity performance by age group](figures/ethnicity_by_age_group.png)
+
+### Age Regression
+
+Parts 1 and 2 evaluate age as a continuous regression target using mean absolute error (MAE).
+
+| Part | Target | MLP MAE | LSTM MAE |
 | --- | --- | ---: | ---: |
-| 1 | `age_raw` (MAE) | 6.8286 | 6.5503 |
-| 2 | `age_raw` (MAE) | 7.07 | 6.25 |
-| 3 | `age_bin` (Acc / Macro-F1) | 0.3650 / 0.3460 | 0.4200 / 0.3890 |
-
-### Model Checkpoints
-
-Checkpoints for all three parts are included in this repository:
-
-- Part 1: `results/mlp/part1_mlp_full/` (MLP), `results/lstm/part1_cap150/` (LSTM)
-- Part 2: `results/mlp/part2_mlp_full/` (MLP), `results/lstm/part2_cap150/` (LSTM)
-- Part 3: `results/mlp/part3_mlp_full/` (MLP), `results/lstm/part3_cap150/` (LSTM)
-
-Each directory contains one checkpoint per task (`gender`, `ethnicity`, `age_raw` or `age_bin`).
-
-## Inference
-
-Run demographic prediction on any WAV file using a saved checkpoint:
-
-```bash
-python -m scripts.inference \
-    --checkpoint results/mlp/part1_mlp_full/gender/best_mlp_gender.pt \
-    --audio /path/to/speaker.wav
-```
+| 1 | `age_raw` | 6.8286 | 6.5503 |
+| 2 | `age_raw` | 7.0700 | 6.2500 |
 
 ## Repository Structure
 
-- `scripts/`: preprocessing, feature extraction, training, and evaluation code
-- `hpc/`: PBS job scripts for running pipeline stages on a HPC cluster
-- `data/`: metadata and split definitions
-- `docs/`: supplementary workflow notes and usage guides
-- `figures/`: diagrams and report figures
-- `results/`: saved checkpoints, evaluation metrics, and plots
+- `scripts/`: preprocessing, feature extraction, model training, evaluation, analysis, and figure generation
+- `docs/`: pipeline and utterance-table guides
+- `data/`: lightweight metadata summaries and split definitions
+- `figures/`: README and report figures
+- `results/evaluation/`: saved summary metrics and confusion-matrix plots
+- `requirements.txt`: Python package requirements
 
 Additional documentation:
 
-- `docs/PIPELINE.md`: step-by-step commands for reproducing the full pipeline
-- `docs/UTTERANCE_TABLE_GUIDE.md`: guide for building per-part utterance tables, including Part 3 TextGrid slicing
-- `docs/DATASET_ADAPTATION_GUIDE.md`: how to adapt the pipeline to a new dataset
+- `docs/PIPELINE.md`: end-to-end commands for reproducing the experiments
+- `docs/UTTERANCE_TABLE_GUIDE.md`: utterance-table construction details

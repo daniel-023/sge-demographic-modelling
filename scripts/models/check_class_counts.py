@@ -32,7 +32,7 @@ def build_dataset(model_type, embedding_dir, split, task, metadata_csv, split_di
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_type", choices=["mlp", "lstm"], default="mlp")
-    parser.add_argument("--task", choices=["gender", "ethnicity", "age_bin", "age_code", "age_raw"], required=True)
+    parser.add_argument("--task", choices=["gender", "ethnicity", "age_bin", "age_raw"], required=True)
     parser.add_argument("--embedding_dir", type=Path, required=True)
     parser.add_argument("--metadata_csv", type=Path, required=True)
     parser.add_argument("--split_dir", type=Path, default=None)

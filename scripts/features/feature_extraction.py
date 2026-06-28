@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """
-Dual-purpose WavLM extraction for:
-  (A) MLP: utterance-level pooled embeddings  [D]
-  (B) LSTM: variable-length frame sequences  [T, D]  (TRIMMED; no padding saved)
+Extract WavLM embeddings for downstream demographic prediction models.
 
-Edits vs your version:
-  1) Use AutoFeatureExtractor (safer for WavLM configs)
-  2) Cache torchaudio resamplers (much faster)
-  3) Make last_hidden_state access robust under DataParallel
+The script can write pooled utterance-level embeddings for MLP models and
+trimmed frame-level sequences for LSTM models in a single WavLM pass.
 """
 
 import os
@@ -55,7 +51,7 @@ def parse_args() -> argparse.Namespace:
         "--utt-csv",
         type=Path,
         default=None,
-        help="Utterance CSV with path, utt_id, speaker_id. Default: data/metadata/cleaned/part{part}_utterances.csv",
+        help="Utterance CSV with path, utt_id, speaker_id. Default: data/metadata/utterances/part{part}_utterances.csv",
     )
     p.add_argument(
         "--out-dir",
@@ -69,12 +65,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lstm-shard-utts", type=int, default=DEFAULT_LSTM_SHARD_UTTS, help="Utterances per LSTM shard.")
     p.add_argument("--max-frames", type=int, default=DEFAULT_MAX_FRAMES, help="Optional cap on frames per utterance for LSTM.")
     p.add_argument(
-        "--max-utts-per-speaker",
-        type=int,
-        default=None,
-        help="Deprecated global cap applied to both outputs unless a per-output cap is provided.",
-    )
-    p.add_argument(
         "--mlp-max-utts-per-speaker",
         type=int,
         default=None,
@@ -86,12 +76,7 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_LSTM_MAX_UTTS_PER_SPEAKER,
         help="Per-speaker cap applied only to LSTM embeddings.",
     )
-    p.add_argument(
-        "--utt-sample-seed",
-        type=int,
-        default=42,
-        help="Random seed for per-speaker utterance sampling when --max-utts-per-speaker is set.",
-    )
+    p.add_argument("--utt-sample-seed", type=int, default=42, help="Random seed for per-speaker utterance sampling.")
     p.add_argument(
         "--outputs",
         type=str,
@@ -104,7 +89,7 @@ def parse_args() -> argparse.Namespace:
 
 def sample_per_speaker_indices(df: pd.DataFrame, cap: int, seed: int) -> set[int]:
     if cap <= 0:
-        raise ValueError("--max-utts-per-speaker must be a positive integer")
+        raise ValueError("Per-speaker utterance caps must be positive integers")
 
     speaker_to_indices = df.groupby("speaker_id").indices
     rng = random.Random(seed)
@@ -139,7 +124,7 @@ def safe_mkdir(p: Path) -> None:
 
 
 def next_shard_id(shard_dir: Path, prefix: str) -> int:
-    """Resume-friendly: infer next shard id from existing files."""
+    """Append-friendly shard numbering based on existing shard filenames."""
     existing = sorted(shard_dir.glob(f"{prefix}_shard_*.pt"))
     if not existing:
         return 0
@@ -233,11 +218,6 @@ def main():
     print(f"[CONFIG] part={args.part}")
     print(f"[CONFIG] utt_csv={args.utt_csv}")
     print(f"[CONFIG] out_dir={out_root}")
-    if args.max_utts_per_speaker is not None:
-        print(
-            f"[CONFIG] global_max_utts_per_speaker={args.max_utts_per_speaker} "
-            f"(seed={args.utt_sample_seed})"
-        )
     if do_mlp and args.mlp_max_utts_per_speaker is not None:
         print(
             f"[CONFIG] mlp_max_utts_per_speaker={args.mlp_max_utts_per_speaker} "
@@ -269,12 +249,6 @@ def main():
         mlp_cap = None
     if lstm_cap is not None and lstm_cap <= 0:
         lstm_cap = None
-    if args.max_utts_per_speaker is not None:
-        if mlp_cap is None:
-            mlp_cap = args.max_utts_per_speaker
-        if lstm_cap is None:
-            lstm_cap = args.max_utts_per_speaker
-
     mlp_keep_indices = set(range(len(df)))
     lstm_keep_indices = set(range(len(df)))
     if do_mlp and mlp_cap is not None:
@@ -297,7 +271,6 @@ def main():
     feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ID)
     model = AutoModel.from_pretrained(MODEL_ID).eval().to(device)
 
-    # Optional: DataParallel
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs with DataParallel")
         model = torch.nn.DataParallel(model)
@@ -354,7 +327,6 @@ def main():
 
         with torch.inference_mode():
             outputs = model(**inputs)
-            # Robust under DataParallel (sometimes returns tuple)
             hs = outputs.last_hidden_state if hasattr(outputs, "last_hidden_state") else outputs[0]  # [B, T, D]
             attn = inputs["attention_mask"]  # [B, T_audio]
             base_model = model.module if isinstance(model, torch.nn.DataParallel) else model

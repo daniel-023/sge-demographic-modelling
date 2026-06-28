@@ -6,7 +6,17 @@ from contextlib import nullcontext
 import time
 
 import torch
+import torch.nn as nn
 from torch.utils.data import WeightedRandomSampler
+
+
+def get_default_device():
+    """Select the best available PyTorch device for local or GPU runs."""
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 def build_weighted_sampler(dataset, num_classes=None):
@@ -25,6 +35,35 @@ def build_weighted_sampler(dataset, num_classes=None):
         num_samples=len(sample_weights),
         replacement=True,
     )
+
+
+def build_training_criterion(
+    task_type,
+    train_dataset,
+    device,
+    class_weighted_loss=True,
+    selection_metric="f1_macro",
+):
+    """Build a loss and selection metric without changing task-specific behavior."""
+    if task_type == "classification":
+        class_weights = None
+        if class_weighted_loss:
+            train_labels = torch.tensor(
+                [int(sample[-1]) for sample in train_dataset.samples], dtype=torch.long
+            )
+            counts = torch.bincount(train_labels, minlength=train_dataset.num_classes).float()
+            counts = torch.clamp(counts, min=1.0)
+            class_weights = (counts.sum() / (train_dataset.num_classes * counts)).to(device)
+            print(f"Class-weighted loss: enabled (weights={class_weights.tolist()})")
+        return nn.CrossEntropyLoss(weight=class_weights), selection_metric
+
+    criterion = nn.L1Loss()
+    if class_weighted_loss:
+        print("Ignoring --class_weighted_loss for regression task.")
+    if selection_metric != "accuracy":
+        print("Ignoring --selection_metric for regression task; using mae for checkpoint selection.")
+    return criterion, "mae"
+
 
 def _unpack_batch(batch):
     if len(batch) == 2:

@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precisio
 from torch.utils.data import DataLoader
 
 from scripts.models.architectures import build_model
-from scripts.models.training_utils import predict
+from scripts.models.training_utils import get_default_device, predict
 from scripts.utils.data_loaders import EmbeddingDataset, SequenceEmbeddingDataset, pad_sequence_collate
 from scripts.utils.metrics import compute_metrics, plot_confusion_matrix
 
@@ -187,12 +187,7 @@ def main():
     )
     args = parser.parse_args()
 
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
+    device = get_default_device()
     print(f"Using device: {device}")
 
     checkpoint = torch.load(args.checkpoint, map_location=device)

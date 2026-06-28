@@ -186,7 +186,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -210,12 +210,24 @@ __marimo__/
 .DS_Store
 **/.DS_Store
 
+# Python runtime caches
+__pycache__/
+*.py[cod]
+
 # Raw audio files (too large for git)
 data/audio/
 
 # Raw metadata source files (large / potentially sensitive)
 data/metadata/raw_metadata/
 data/metadata/p3_textgrid/
+
+# Generated utterance indexes can be tens or hundreds of MB.
+data/metadata/utterances/*.csv
+
+# Model checkpoints and tensor artifacts are generated outputs.
+*.pt
+*.pth
+*.ckpt
 
 # WavLM embedding shards (too large for git; can be hundreds of MB to GB)
 
@@ -226,3 +238,7 @@ results/analysis/speaker_embeddings/
 
 # Dataset index caches (auto-generated at runtime by data_loaders.py)
 **/.index_cache/
+
+# Presentation exports and previews generated during figure drafting
+figures/*.pptx
+figures/*_preview.png

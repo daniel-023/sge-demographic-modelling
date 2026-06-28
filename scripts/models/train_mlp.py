@@ -6,13 +6,14 @@ import argparse
 from pathlib import Path
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from scripts.models.architectures.mlp import DemographicMLP
 from scripts.models.training_utils import (
+    build_training_criterion,
     build_weighted_sampler,
+    get_default_device,
     predict,
     train_epoch,
     validate,
@@ -29,7 +30,7 @@ def main():
         "--task",
         type=str,
         required=True,
-        choices=["gender", "ethnicity", "age_bin", "age_code", "age_raw"],
+        choices=["gender", "ethnicity", "age_bin", "age_raw"],
     )
     parser.add_argument("--embedding_dir", type=Path, required=True)
     parser.add_argument("--metadata_csv", type=Path, required=True)
@@ -81,12 +82,7 @@ def main():
         args.output_dir = DEFAULT_RESULTS_ROOT / "mlp" / args.embedding_dir.name / args.task
 
     task_type = task_type_for(args.task)
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
+    device = get_default_device()
     print(f"Using device: {device}")
 
     train_dataset = EmbeddingDataset(
@@ -142,28 +138,13 @@ def main():
     }
     model = DemographicMLP(**model_kwargs).to(device)
 
-    if task_type == "classification":
-        class_weights = None
-        if args.class_weighted_loss:
-            train_labels = torch.tensor(
-                [int(sample[-1]) for sample in train_dataset.samples], dtype=torch.long
-            )
-            counts = torch.bincount(train_labels, minlength=train_dataset.num_classes).float()
-            counts = torch.clamp(counts, min=1.0)
-            class_weights = (counts.sum() / (train_dataset.num_classes * counts)).to(device)
-            print(f"Class-weighted loss: enabled (weights={class_weights.tolist()})")
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
-        selection_metric_name = args.selection_metric
-    else:
-        # Align optimization with MAE reporting/selection.
-        criterion = nn.L1Loss()
-        if args.class_weighted_loss:
-            print("Ignoring --class_weighted_loss for regression task.")
-        if args.selection_metric != "accuracy":
-            print(
-                "Ignoring --selection_metric for regression task; using mae for checkpoint selection."
-            )
-        selection_metric_name = "mae"
+    criterion, selection_metric_name = build_training_criterion(
+        task_type=task_type,
+        train_dataset=train_dataset,
+        device=device,
+        class_weighted_loss=args.class_weighted_loss,
+        selection_metric=args.selection_metric,
+    )
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

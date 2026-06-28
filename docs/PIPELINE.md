@@ -1,14 +1,13 @@
 # Pipeline Guide
 
-End-to-end walkthrough for reproducing the experiments. All commands are run from the repository root. Heavy stages (feature extraction, training) are intended for an HPC cluster — see `hpc/` for the corresponding PBS job scripts.
+End-to-end walkthrough for reproducing the experiments. All commands are run from the repository root. Heavy stages such as WavLM feature extraction and LSTM training should be run on a GPU machine or cluster, but the commands are standard Python entrypoints and are not tied to a specific scheduler.
 
 ## Prerequisites
 
-Install dependencies (PyTorch and torchaudio must be installed separately for your CUDA version):
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
-pip install torch torchaudio
 ```
 
 ---
@@ -18,7 +17,7 @@ pip install torch torchaudio
 Normalise speaker metadata from the raw NSC XLSX files. Run once per corpus part.
 
 ```bash
-python -m scripts.preprocessing.clean_metadata --parts 1 2 3
+python3 -m scripts.preprocessing.clean_metadata --parts 1 2 3
 ```
 
 **Output:** `data/metadata/cleaned/part{N}_speakers.csv`
@@ -32,7 +31,7 @@ Each row is one speaker with columns: `speaker_id`, `gender`, `ethnicity`, `age`
 Generate stratified, speaker-level splits (70/15/15 by default, stratified by gender × ethnicity × age group).
 
 ```bash
-python -m scripts.preprocessing.data_split --parts 1 2 3
+python3 -m scripts.preprocessing.data_split --parts 1 2 3
 ```
 
 **Output:** `data/splits/part{N}_{train,val,test}.txt` — one speaker ID per line.
@@ -45,10 +44,10 @@ Index all utterances for a part. Part 3 requires TextGrid slicing (see below).
 
 ```bash
 # Parts 1 and 2 (speaker-folder layout)
-python -m scripts.preprocessing.build_utterance_table --parts 1 2
+python3 -m scripts.preprocessing.build_utterance_table --parts 1 2
 
 # Part 3 with TextGrid slicing
-python -m scripts.preprocessing.build_utterance_table \
+python3 -m scripts.preprocessing.build_utterance_table \
     --parts 3 \
     --part3_use_textgrid \
     --part3_audio_dir /path/to/part3/conversation_wavs \
@@ -58,24 +57,26 @@ python -m scripts.preprocessing.build_utterance_table \
 
 **Output:** `data/metadata/utterances/part{N}_utterances.csv`
 
+Utterance tables are generated artifacts and are ignored by git because they can be large.
+
 See [UTTERANCE_TABLE_GUIDE.md](UTTERANCE_TABLE_GUIDE.md) for the full argument reference.
 
 ---
 
 ## Stage 4 — Extract WavLM Embeddings
 
-Extract `microsoft/wavlm-base-plus` frame embeddings for each split. This stage is GPU-intensive and should be run on HPC (`hpc/feature_extraction.pbs`).
+Extract `microsoft/wavlm-base-plus` frame embeddings for each split. This stage is GPU-intensive.
 
 ```bash
-python -m scripts.features.feature_extraction \
+python3 -m scripts.features.feature_extraction \
     --part 1 \
     --split train
 
-python -m scripts.features.feature_extraction \
+python3 -m scripts.features.feature_extraction \
     --part 1 \
     --split val
 
-python -m scripts.features.feature_extraction \
+python3 -m scripts.features.feature_extraction \
     --part 1 \
     --split test
 ```
@@ -90,40 +91,40 @@ Repeat for each part and split. The `--outputs` flag can restrict to `mlp` or `l
 
 ## Stage 5 — Train Models
 
-Run on HPC (`hpc/train_mlp.pbs`, `hpc/train_lstm.pbs`). Example local commands:
+Example training commands:
 
 ```bash
 # MLP — gender, Part 1
-python -m scripts.models.train_mlp \
+python3 -m scripts.models.train_mlp \
     --task gender \
-    --embedding_dir results/embeddings/baseplus/part1_mlp_full \
+    --embedding_dir results/embeddings/baseplus/part1 \
     --metadata_csv data/metadata/cleaned/part1_speakers.csv \
     --split_dir data/splits
 
 # LSTM — ethnicity, Part 1
-python -m scripts.models.train_lstm \
+python3 -m scripts.models.train_lstm \
     --task ethnicity \
-    --embedding_dir results/embeddings/baseplus/part1_cap150 \
+    --embedding_dir results/embeddings/baseplus/part1 \
     --metadata_csv data/metadata/cleaned/part1_speakers.csv \
     --split_dir data/splits
 ```
 
-Supported tasks: `gender`, `ethnicity`, `age_bin`, `age_raw`.
+Supported tasks: `gender`, `ethnicity`, `age_bin`, `age_raw`. The README reports age regression results only, but age-bin classification remains supported for reproducibility.
 
-**Output:** `results/{mlp,lstm}/{embedding_dir_name}/{task}/best_{model}_{task}.pt`
+**Output:** checkpoints under `results/mlp/{embedding_dir_name}/{task}/` or `results/lstm/{embedding_dir_name}_1layer/{task}/` when using the default one-layer LSTM.
 
-Use `smoke_train_mlp.pbs` / `smoke_train_lstm.pbs` for a quick 1-epoch sanity check before submitting full jobs.
+Checkpoints are generated artifacts and are ignored by git.
 
 ---
 
 ## Stage 6 — Evaluate
 
-Evaluate a saved checkpoint on the test split. Run on HPC (`hpc/evaluate_model.pbs`) or locally.
+Evaluate a saved checkpoint on the test split.
 
 ```bash
-python -m scripts.models.evaluate \
-    --checkpoint results/mlp/part1_mlp_full/gender/best_mlp_gender.pt \
-    --embedding_dir results/embeddings/baseplus/part1_mlp_full \
+python3 -m scripts.models.evaluate \
+    --checkpoint results/mlp/part1/gender/best_mlp_gender.pt \
+    --embedding_dir results/embeddings/baseplus/part1 \
     --metadata_csv data/metadata/cleaned/part1_speakers.csv \
     --split_dir data/splits \
     --part part1
@@ -138,35 +139,21 @@ python -m scripts.models.evaluate \
 ### Corpus and demographic statistics
 
 ```bash
-python -m scripts.analysis.corpus_stats --parts 1 2 3
-python -m scripts.analysis.demographic_stats --parts 1 2 3
+python3 -m scripts.analysis.corpus_stats --parts 1 2 3
+python3 -m scripts.analysis.demographic_stats --parts 1 2 3
 ```
 
 ### Speaker-level t-SNE visualisation
 
 ```bash
 # Aggregate speaker embeddings
-python -m scripts.analysis.speaker_embeddings \
-    --mlp-shard-dir results/embeddings/baseplus/part1_mlp_full/train/mlp_shards \
+python3 -m scripts.analysis.speaker_embeddings \
+    --mlp-shard-dir results/embeddings/baseplus/part1/train/mlp_shards \
     --metadata-csv data/metadata/cleaned/part1_speakers.csv \
     --out-path results/analysis/speaker_embeddings/part1/speaker_embeddings.pt
 
 # Generate t-SNE plots
-python -m scripts.analysis.speaker_tsne \
+python3 -m scripts.analysis.speaker_tsne \
     --emb-path results/analysis/speaker_embeddings/part1/speaker_embeddings.pt \
     --out-dir results/analysis/tsne/part1
 ```
-
----
-
-## Live Inference
-
-Run inference on a single WAV file without pre-extracted embeddings:
-
-```bash
-python -m scripts.inference \
-    --checkpoint results/mlp/part1_mlp_full/gender/best_mlp_gender.pt \
-    --audio /path/to/speaker.wav
-```
-
-WavLM is extracted on-the-fly. The checkpoint is self-describing — no additional configuration needed.
