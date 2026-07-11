@@ -23,11 +23,11 @@ Workflow:
 2. Build utterance tables from the speech corpus.
 3. Extract WavLM embeddings for each utterance.
 4. Train MLP and LSTM demographic prediction heads.
-5. Evaluate held-out performance and subgroup behaviour.
+5. Evaluate held-out performance and class-level/subgroup behaviour.
 
 ## Results
 
-Saved summary metrics are included under `results/evaluation/`. Large generated artifacts such as embedding shards, utterance tables, and model checkpoints are intentionally excluded from git.
+Saved summary metrics are included under `results/evaluation/`.
 
 ### Gender and Ethnicity
 
